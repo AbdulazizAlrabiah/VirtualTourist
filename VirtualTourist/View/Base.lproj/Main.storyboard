@@ -43,7 +43,11 @@
                     </connections>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="dkx-z0-nzr" sceneMemberID="firstResponder"/>
-                <pongPressGestureRecognizer allowableMovement="10" minimumPressDuration="0.5" id="23K-c6-SXF"/>
+                <pongPressGestureRecognizer delaysTouchesBegan="YES" delaysTouchesEnded="NO" allowableMovement="10" minimumPressDuration="0.5" id="23K-c6-SXF">
+                    <connections>
+                        <outlet property="delegate" destination="BYZ-38-t0r" id="PEL-Iy-R6a"/>
+                    </connections>
+                </pongPressGestureRecognizer>
             </objects>
             <point key="canvasLocation" x="774" y="6"/>
         </scene>
