@@ -8,14 +8,24 @@
 
 import UIKit
 import MapKit
+import CoreData
 
 class MapViewController: UIViewController {
-
+    
     @IBOutlet weak var mapView: MKMapView!
+    
+    var dataController: DataController!
+    
+    var pins: [Pin] = []
+    var annotations = [MKPointAnnotation]()
+    
+    var pinToNextVC: Pin!
     
     override func viewDidLoad() {
         super.viewDidLoad()
-
+        
+        loadPins()
+        
         let press = UILongPressGestureRecognizer(target: self, action: #selector(press(tap:)))
         mapView.addGestureRecognizer(press)
     }
@@ -31,6 +41,31 @@ class MapViewController: UIViewController {
         annotation.coordinate = coordinate
 
         mapView.addAnnotation(annotation)
+    }
+    
+    func loadPins() {
+        
+        let fetchRequest: NSFetchRequest<Pin> = Pin.fetchRequest()
+        if let result = try? dataController.viewContext.fetch(fetchRequest) {
+            pins = result
+        }
+        fillAnotationArray()
+    }
+    
+    func fillAnotationArray(){
+        
+        for dictionary in pins {
+            let lat = CLLocationDegrees(dictionary.latitude)
+            let long = CLLocationDegrees(dictionary.longtitude)
+            
+            let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: long)
+            
+            let annotation = MKPointAnnotation()
+            annotation.coordinate = coordinate
+            
+            annotations.append(annotation)
+        }
+        self.mapView.addAnnotations(annotations)
     }
 }
 
@@ -57,7 +92,22 @@ extension MapViewController: MKMapViewDelegate {
     
     func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
         
+        pinToNextVC = Pin(context: dataController.viewContext)
+        pinToNextVC.latitude = (view.annotation?.coordinate.latitude)!
+        pinToNextVC.longtitude = (view.annotation?.coordinate.longitude)!
+        
+        try? dataController.viewContext.save()
         performSegue(withIdentifier: "GoToPhotoAlbum", sender: nil)
+    }
+    
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        
+        if segue.identifier == "GoToPhotoAlbum" {
+            let PhotoVC = segue.destination as! PhotoAlbumViewController
+
+            PhotoVC.pin = self.pinToNextVC
+            PhotoVC.dataController = self.dataController
+        }
     }
 }
 
