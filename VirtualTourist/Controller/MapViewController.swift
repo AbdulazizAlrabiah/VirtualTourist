@@ -37,9 +37,9 @@ class MapViewController: UIViewController {
         let pin = tap.location(in: mapView)
         let coordinate = mapView.convert(pin, toCoordinateFrom: mapView)
         let annotation = MKPointAnnotation()
-
+        
         annotation.coordinate = coordinate
-
+        
         mapView.addAnnotation(annotation)
     }
     
@@ -54,9 +54,9 @@ class MapViewController: UIViewController {
     
     func fillAnotationArray(){
         
-        for dictionary in pins {
-            let lat = CLLocationDegrees(dictionary.latitude)
-            let long = CLLocationDegrees(dictionary.longtitude)
+        for pin in pins {
+            let lat = CLLocationDegrees(pin.latitude)
+            let long = CLLocationDegrees(pin.longtitude)
             
             let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: long)
             
@@ -92,22 +92,26 @@ extension MapViewController: MKMapViewDelegate {
     
     func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
         
-        pinToNextVC = Pin(context: dataController.viewContext)
-        pinToNextVC.latitude = (view.annotation?.coordinate.latitude)!
-        pinToNextVC.longtitude = (view.annotation?.coordinate.longitude)!
-        
-        try? dataController.viewContext.save()
+        if let pin = pins.first(where: { $0.latitude == view.annotation?.coordinate.latitude && $0.longtitude == view.annotation?.coordinate.longitude }) {
+            pinToNextVC = pin
+        } else {
+            pinToNextVC = Pin(context: dataController.viewContext)
+            pinToNextVC.latitude = (view.annotation?.coordinate.latitude)!
+            pinToNextVC.longtitude = (view.annotation?.coordinate.longitude)!
+            pins.append(pinToNextVC)
+            try? dataController.viewContext.save()
+        }
         performSegue(withIdentifier: "GoToPhotoAlbum", sender: nil)
+        mapView.deselectAnnotation(view.annotation, animated: true)
     }
     
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         
         if segue.identifier == "GoToPhotoAlbum" {
             let PhotoVC = segue.destination as! PhotoAlbumViewController
-
+            
             PhotoVC.pin = self.pinToNextVC
             PhotoVC.dataController = self.dataController
         }
     }
 }
-

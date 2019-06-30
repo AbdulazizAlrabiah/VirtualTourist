@@ -16,20 +16,31 @@ class PhotoAlbumViewController: UIViewController {
     @IBOutlet weak var flowLayout: UICollectionViewFlowLayout!
     @IBOutlet weak var collectionView: UICollectionView!
     
-    var images: [Photo]?
     var fetchedResultsController: NSFetchedResultsController<Photo>!
     var pin: Pin!
     var dataController: DataController!
+    var photo: Photo!
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
+        noImagesLabel.isHidden = true
+        newCollectionButton.isEnabled = false
+        
+        loadPhotos()
     }
     
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
+    @IBAction func newCollectionButtonPressed(_ sender: Any) {
         
-        noImagesLabel.isHidden = true
+        for photoToDelete in fetchedResultsController.fetchedObjects! {
+            dataController.viewContext.delete(photoToDelete)
+        }
+        save()
+        newCollectionButton.isEnabled = false
+        requestImages()
+    }
+    
+    func loadPhotos() {
         
         let fetchRequest: NSFetchRequest<Photo> = Photo.fetchRequest()
         let predicate = NSPredicate(format: "pin == %@", pin)
@@ -41,90 +52,99 @@ class PhotoAlbumViewController: UIViewController {
         
         do {
             try fetchedResultsController.performFetch()
-        } catch {
             
+            if fetchedResultsController.fetchedObjects?.count == 0 {
+                requestImages()
+            }
+        } catch {
+            fatalError("The fetch could not be performed: \(error.localizedDescription)")
         }
-        
-//        if let result = try? dataController.viewContext.fetch(fetchRequest) {
-//            if result.isEmpty {
-//                print("empty")
-//                requestImages()
-//            } else {
-//                images = result
-//                collectionView.reloadData()
-//            }
-//        }
-    }
-    
-    @IBAction func newCollectionButtonPressed(_ sender: Any) {
-        
-        requestImages()
     }
     
     func requestImages() {
         
-        FlickrAPI.getImages(lat: pin.latitude, long: pin.longtitude, completion: { (images) in
+        FlickrAPI.getImages(lat: pin.latitude, long: pin.longtitude, completion: { (URLs) in
             
-            self.fillPhotosAndSave(images: images)
+            self.fillPhotosAndSave(URLs: URLs)
             
-            if self.images?.count == 0 {
+            if self.fetchedResultsController.sections?[0].numberOfObjects == 0 {
                 self.noImagesLabel.isHidden = false
             }
-            
-            print("images = ", images.count)
             self.collectionView.reloadData()
-        }) { (number) in
-            //            self.num = number
-            //            print("a")
-            //            self.collectionView.reloadData()
+        }) { (error) in
+            self.alertFailure(message: error)
         }
     }
     
-    func fillPhotosAndSave(images: [Data]) {
+    func alertFailure(message: String) {
         
-        self.images = []
+        let alertVC = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        alertVC.addAction(UIAlertAction(title: "Dismiss", style: .default, handler: nil))
+        showDetailViewController(alertVC, sender: nil)
+    }
+    
+    func fillPhotosAndSave(URLs: [String]) {
         
-        for image in images {
-            
-            let photo = Photo(context: dataController.viewContext)
-            photo.image = image
-            photo.pin = self.pin
-            try? self.dataController.viewContext.save()
-            self.images?.append(photo)
+        for (index, url) in URLs.enumerated() {
+            photo = Photo(context: dataController.viewContext)
+            self.photo.url = url
+            self.photo.pin = pin
+            save()
         }
-        print("done")
+    }
+    
+    func getData(url: String, indexPath: IndexPath) {
+        
+        FlickrAPI.getData(url: url) { (imageData) in
+            self.fetchedResultsController.object(at: indexPath).image = imageData
+            self.save()
+        }
+    }
+    
+    func save() {
+        try? self.dataController.viewContext.save()
     }
 }
+
 extension PhotoAlbumViewController: UICollectionViewDelegate, UICollectionViewDataSource {
     
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         
-        return images?.count ?? 15
+        return fetchedResultsController.fetchedObjects?.count ?? 0
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "Photos", for: indexPath) as! CollectionViewCell
         
-        guard images != nil else {
+        guard fetchedResultsController.object(at: indexPath).image != nil else {
             cell.activityIndicator.startAnimating()
+            cell.imageView.image = nil
+            self.getData(url: self.fetchedResultsController.object(at: indexPath).url!, indexPath: indexPath)
             return cell
         }
-        print("here")
-        let image = UIImage(data: (images?[indexPath.row].image)!)
         
-        cell.imageView.image = image
+        let data = fetchedResultsController.object(at: indexPath).image
+        cell.imageView.image = UIImage(data: data!)
         cell.activityIndicator.stopAnimating()
+        
+        if fetchedResultsController.fetchedObjects?.last?.image != nil {
+            self.newCollectionButton.isEnabled = true
+        }
         
         return cell
     }
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         
-        
+        dataController.viewContext.delete(fetchedResultsController.object(at: indexPath))
+        save()
     }
 }
+
 extension PhotoAlbumViewController: NSFetchedResultsControllerDelegate {
     
-    
+    func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
+        collectionView.reloadData()
+    }
 }

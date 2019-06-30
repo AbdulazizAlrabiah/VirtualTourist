@@ -11,8 +11,7 @@ import UIKit
 
 class FlickrAPI {
     
-    static var arrayOfURLS: [String] = []
-    static var arrayOfData: [Data] = []
+    static var arrayOfURLs: [String] = []
     
     struct Endpoint {
         static let flickrBaseURL: String = "https://www.flickr.com/services/rest/?method=flickr.photos.search&api_key=a996bd52a219a6eadaab624e2abd78b7"
@@ -22,79 +21,65 @@ class FlickrAPI {
         }
     }
     
-    class func request<T: Codable>(url: String, completion: @escaping (T) -> Void) {
+    class func request<T: Codable>(url: String, completion: @escaping (T) -> Void, errorr: @escaping (String) -> Void) {
         
         let request = URLRequest(url: URL(string: url)!)
         
         URLSession.shared.dataTask(with: request) { (data, response, error) in
             guard error == nil else {
                 DispatchQueue.main.async {
-                    print("connection error")
+                    errorr("Connection error please try again")
                 }
                 return
             }
             guard let data = data else {
                 DispatchQueue.main.async {
-                    print("connection error")
+                    errorr("Connection error please try again")
                 }
                 return
             }
             do {
-                //print(String(data: data, encoding: .utf8)!)
                 let object = try JSONDecoder().decode(T.self, from: data)
                 DispatchQueue.main.async {
                     completion(object)
                 }
             } catch {
-                print("connection error")
+                DispatchQueue.main.async {
+                    errorr("Error please try again later")
+                }
             }
             }.resume()
     }
     
-    class func getImages(lat: Double, long: Double, completion: @escaping ([Data]) -> Void, number: @escaping (Int) -> Void) {
+    class func getImages(lat: Double, long: Double, completion: @escaping ([String]) -> Void, errorOccured: @escaping (String) -> Void) {
         
         let random = Int.random(in: 1...10)
-        print(random)
-        request(url: Endpoint.fillURL(random: random, lat: lat, long: long)) { (results: PhotoAlbumResponse) in
+        
+        request(url: Endpoint.fillURL(random: random, lat: lat, long: long), completion: { (results: PhotoAlbumResponse) in
             
-           // number(results.photos.photo.count)
+            fillURLsArray(photos: results.photos.photo)
             
-            getData(photos: results.photos.photo)
-            
-            completion(self.arrayOfData)
-        }
-        arrayOfURLS.removeAll()
-        arrayOfData.removeAll()
+            DispatchQueue.main.async {
+                completion(self.arrayOfURLs)
+            }
+        }, errorr: { (error) in
+            errorOccured(error)
+        })
+        arrayOfURLs.removeAll()
     }
     
-//    class func totalPhotos(lat: Double, long: Double, completion: @escaping (Int) -> Void) {
-//
-//        let random = Int.random(in: 1...100)
-//
-//        request(url: Endpoint.fillURL(random: random, lat: lat, long: long)) { (results: PhotoAlbumResponse) in
-//            completion( results.photos.photo.count)
-//        }
-//    }
-    
-    class func getData(photos: [PhotoAlbumArrayResponse]) {
+    class func fillURLsArray(photos: [PhotoAlbumArrayResponse]) {
         
         for (index, photo) in photos.enumerated() {
-            arrayOfURLS.append("https://farm\(photo.farm).staticflickr.com/\(photo.server)/\(photo.id)_\(photo.secret)_s.jpg")
-            
-            let imageData = try? Data(contentsOf: URL(string: arrayOfURLS[index])!)
-            
-            arrayOfData.append(imageData!)
+            arrayOfURLs.append("https://farm\(photo.farm).staticflickr.com/\(photo.server)/\(photo.id)_\(photo.secret)_s.jpg")
         }
     }
     
-//    class func getImageData(url: String) -> Data {
-//
-//
-//
-//
-//
-//        return imageData!
-//
-//        //let image = UIImage(data: imagData!)
-//    }
+    class func getData(url: String, completion: @escaping (Data) -> Void) {
+        
+        DispatchQueue.main.async {
+            let imageData =  try? Data(contentsOf: URL(string: url)!)
+            completion(imageData!)
+        }
+    }
 }
