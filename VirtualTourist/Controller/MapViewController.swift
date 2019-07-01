@@ -15,11 +15,9 @@ class MapViewController: UIViewController {
     @IBOutlet weak var mapView: MKMapView!
     
     var dataController: DataController!
-    
     var pins: [Pin] = []
     var annotations = [MKPointAnnotation]()
-    
-    var pinToNextVC: Pin!
+    var pinToSave: Pin!
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -36,6 +34,13 @@ class MapViewController: UIViewController {
         
         let pin = tap.location(in: mapView)
         let coordinate = mapView.convert(pin, toCoordinateFrom: mapView)
+        
+        pinToSave = Pin(context: dataController.viewContext)
+        pinToSave.latitude = (coordinate.latitude)
+        pinToSave.longtitude = (coordinate.longitude)
+        pins.append(pinToSave)
+        try? dataController.viewContext.save()
+        
         let annotation = MKPointAnnotation()
         
         annotation.coordinate = coordinate
@@ -86,22 +91,17 @@ extension MapViewController: MKMapViewDelegate {
         else {
             pinView!.annotation = annotation
         }
-        
         return pinView
     }
     
     func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
         
+        var pinToNextVC: Pin!
+        
         if let pin = pins.first(where: { $0.latitude == view.annotation?.coordinate.latitude && $0.longtitude == view.annotation?.coordinate.longitude }) {
             pinToNextVC = pin
-        } else {
-            pinToNextVC = Pin(context: dataController.viewContext)
-            pinToNextVC.latitude = (view.annotation?.coordinate.latitude)!
-            pinToNextVC.longtitude = (view.annotation?.coordinate.longitude)!
-            pins.append(pinToNextVC)
-            try? dataController.viewContext.save()
         }
-        performSegue(withIdentifier: "GoToPhotoAlbum", sender: nil)
+        performSegue(withIdentifier: "GoToPhotoAlbum", sender: pinToNextVC)
         mapView.deselectAnnotation(view.annotation, animated: true)
     }
     
@@ -110,7 +110,7 @@ extension MapViewController: MKMapViewDelegate {
         if segue.identifier == "GoToPhotoAlbum" {
             let PhotoVC = segue.destination as! PhotoAlbumViewController
             
-            PhotoVC.pin = self.pinToNextVC
+            PhotoVC.pin = sender as? Pin
             PhotoVC.dataController = self.dataController
         }
     }
